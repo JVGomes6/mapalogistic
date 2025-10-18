@@ -1,0 +1,1990 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mapa Interativo Palotina - Clima</title>
+<style>
+  :root {
+    --primary-color: #2c3e50;
+    --secondary-color: #3498db;
+    --accent-color: #ffcc00;
+    --text-color: #333;
+    --bg-color: #f8f9fa;
+    --card-bg: #ffffff;
+    --shadow: 0 4px 12px rgba(0,0,0,0.15);
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #000;
+    color: var(--text-color);
+    height: 100vh;
+    overflow: hidden;
+    position: relative;
+    user-select: none;
+    transition: background-color 0.3s ease;
+  }
+
+  .dark-mode {
+    --primary-color: #ecf0f1;
+    --secondary-color: #3498db;
+    --accent-color: #f39c12;
+    --text-color: #ecf0f1;
+    --bg-color: #2c3e50;
+    --card-bg: #34495e;
+    --shadow: 0 4px 12px rgba(0,0,0,0.3);
+  }
+
+  .aviso {
+    position: fixed;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: var(--accent-color);
+    color: #000;
+    font-weight: bold;
+    font-size: 16px;
+    padding: 10px 20px;
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    z-index: 30;
+    text-align: center;
+    max-width: 90%;
+    transition: all 0.3s ease;
+  }
+
+  .aviso:hover {
+    transform: translateX(-50%) scale(1.02);
+  }
+
+  .info {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    background-color: var(--card-bg);
+    padding: 12px 18px;
+    border-radius: 12px;
+    font-weight: bold;
+    color: var(--text-color);
+    font-size: 14px;
+    z-index: 20;
+    text-align: right;
+    box-shadow: var(--shadow);
+    min-width: 180px;
+    transition: all 0.3s ease;
+  }
+
+  .info:hover {
+    transform: translateY(-2px);
+  }
+
+  /* Container do mapa que preenche toda a tela */
+  .mapa-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #000;
+  }
+
+  .mapa-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center center;
+    display: block;
+    transition: filter 2s ease;
+  }
+
+  /* CICLO DIA/NOITE */
+  .ciclo-dia-noite {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(to bottom, 
+      rgba(0, 0, 0, 0) 0%,
+      rgba(0, 0, 0, 0) 100%
+    );
+    z-index: 4;
+    pointer-events: none;
+    transition: background 2s ease;
+  }
+
+  /* Madrugada (00h-05h) */
+  .ciclo-dia-noite.madrugada {
+    background: linear-gradient(to bottom, 
+      rgba(10, 10, 30, 0.8) 0%,
+      rgba(5, 5, 15, 0.9) 100%
+    );
+  }
+
+  /* Amanhecer (05h-07h) */
+  .ciclo-dia-noite.amanhecer {
+    background: linear-gradient(to bottom, 
+      rgba(255, 140, 0, 0.3) 0%,
+      rgba(255, 69, 0, 0.2) 30%,
+      rgba(25, 25, 112, 0.4) 70%,
+      rgba(10, 10, 30, 0.6) 100%
+    );
+  }
+
+  /* Manhã (07h-12h) */
+  .ciclo-dia-noite.manha {
+    background: linear-gradient(to bottom, 
+      rgba(135, 206, 235, 0.1) 0%,
+      rgba(255, 255, 255, 0.05) 30%,
+      rgba(255, 255, 255, 0) 100%
+    );
+  }
+
+  /* Tarde (12h-17h) */
+  .ciclo-dia-noite.tarde {
+    background: linear-gradient(to bottom, 
+      rgba(255, 215, 0, 0.1) 0%,
+      rgba(255, 255, 255, 0.03) 30%,
+      rgba(255, 255, 255, 0) 100%
+    );
+  }
+
+  /* Entardecer (17h-19h) */
+  .ciclo-dia-noite.entardecer {
+    background: linear-gradient(to bottom, 
+      rgba(255, 69, 0, 0.4) 0%,
+      rgba(255, 140, 0, 0.3) 20%,
+      rgba(75, 0, 130, 0.5) 60%,
+      rgba(25, 25, 112, 0.7) 100%
+    );
+  }
+
+  /* Noite (19h-24h) */
+  .ciclo-dia-noite.noite {
+    background: linear-gradient(to bottom, 
+      rgba(25, 25, 112, 0.6) 0%,
+      rgba(10, 10, 30, 0.8) 50%,
+      rgba(5, 5, 15, 0.9) 100%
+    );
+  }
+
+  /* Estrelas para a noite */
+  .estrelas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 3;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 3s ease;
+  }
+
+  .estrelas.visivel {
+    opacity: 1;
+  }
+
+  .estrela {
+    position: absolute;
+    background: white;
+    border-radius: 50%;
+    animation: piscar 4s infinite;
+  }
+
+  @keyframes piscar {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 1; }
+  }
+
+  /* Lua para a noite */
+  .lua {
+    position: fixed;
+    top: 50px;
+    left: 50px;
+    width: 80px;
+    height: 80px;
+    background: radial-gradient(circle, #f8f8ff 0%, #d3d3d3 70%);
+    border-radius: 50%;
+    box-shadow: 
+      0 0 20px 5px rgba(248, 248, 255, 0.6),
+      0 0 40px 15px rgba(211, 211, 211, 0.3);
+    z-index: 4;
+    opacity: 0;
+    transition: opacity 2s ease;
+  }
+
+  .lua.visivel {
+    opacity: 1;
+  }
+
+  /* Efeito de escurecimento para clima */
+  .escurecer-tela {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0);
+    z-index: 6;
+    pointer-events: none;
+    transition: background 1s ease;
+  }
+
+  .escurecer-tela.nublado {
+    background: rgba(0, 0, 0, 0.3);
+  }
+
+  .escurecer-tela.chuva-leve {
+    background: rgba(0, 0, 0, 0.4);
+  }
+
+  .escurecer-tela.chuva-forte {
+    background: rgba(0, 0, 0, 0.6);
+  }
+
+  .escurecer-tela.tempestade {
+    background: rgba(0, 0, 0, 0.7);
+    animation: pulsarTempestade 4s infinite;
+  }
+
+  @keyframes pulsarTempestade {
+    0%, 100% { background: rgba(0, 0, 0, 0.7); }
+    50% { background: rgba(0, 0, 0, 0.8); }
+  }
+
+  /* Menus menores e posicionados absolutamente */
+  .menu {
+    position: absolute;
+    background-color: var(--card-bg);
+    border-radius: 18px;
+    padding: 5px 8px;
+    box-shadow: var(--shadow);
+    cursor: grab;
+    font-weight: bold;
+    color: var(--text-color);
+    min-width: 100px;
+    transition: all 0.3s;
+    z-index: 15;
+    border: 2px solid transparent;
+    text-align: center;
+    font-size: 11px;
+    transform: translate(-50%, -50%);
+    touch-action: none;
+  }
+
+  .menu:hover, .menu:focus {
+    background-color: var(--secondary-color);
+    color: white;
+    transform: translate(-50%, -50%) scale(1.05);
+    border-color: var(--accent-color);
+    outline: none;
+  }
+
+  .menu.ativo {
+    background-color: var(--secondary-color);
+    color: white;
+    border-color: var(--accent-color);
+    z-index: 16;
+  }
+
+  .menu.arrastando {
+    cursor: grabbing;
+    opacity: 0.8;
+    transform: translate(-50%, -50%) scale(1.1);
+    z-index: 100;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.4);
+  }
+
+  .conteudo {
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: max-height 0.4s ease, opacity 0.4s ease;
+    margin-top: 5px;
+    font-weight: normal;
+    background-color: var(--card-bg);
+    padding: 0 8px;
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    color: var(--text-color);
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    z-index: 17;
+    font-size: 10px;
+    pointer-events: none;
+  }
+
+  .menu.ativo .conteudo {
+    max-height: 150px;
+    opacity: 1;
+    padding: 5px 8px;
+    pointer-events: auto;
+  }
+
+  /* POSIÇÕES ABSOLUTAS */
+  #saoCamilo { top: 25%; left: 35%; }
+  #palmital { top: 30%; left: 40%; }
+  #boaVista { top: 35%; left: 30%; }
+  #altoSantaFe { top: 65%; left: 35%; }
+  #maripa { top: 75%; left: 40%; }
+  #cincoMil { top: 70%; left: 55%; }
+  #vilaNice { top: 60%; left: 55%; }
+  #vilaSantoAntonio { top: 40%; left: 60%; }
+  #vilaLaSalle { top: 30%; left: 55%; }
+  #vilaFloresta { top: 20%; left: 70%; }
+  #esquinaProgresso { top: 25%; left: 45%; }
+  #linhaPecuaria { top: 50%; left: 47%; }
+  #linhaSaoCarlos { top: 55%; left: 20%; }
+
+  /* ANIMAÇÕES CLIMÁTICAS MELHORADAS */
+  .chuva, .nuvens, .sol, .neve, .tempestade {
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 5;
+    top: 0;
+    left: 0;
+  }
+
+  /* CHUVA MELHORADA */
+  .gota {
+    position: absolute;
+    background: linear-gradient(to bottom, rgba(100, 149, 237, 0.9), rgba(65, 105, 225, 0.6));
+    animation: cair linear infinite;
+    border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+  }
+
+  .gota.leve {
+    width: 2px;
+    height: 12px;
+    animation-duration: 1.5s;
+  }
+
+  .gota.forte {
+    width: 3px;
+    height: 18px;
+    animation-duration: 0.8s;
+  }
+
+  .gota.tempestade {
+    width: 4px;
+    height: 22px;
+    animation-duration: 0.5s;
+    background: linear-gradient(to bottom, rgba(70, 130, 180, 0.9), rgba(30, 70, 120, 0.7));
+  }
+
+  @keyframes cair {
+    0% { 
+      transform: translateY(-20px) translateX(0) rotate(15deg); 
+      opacity: 1; 
+    }
+    80% { 
+      opacity: 0.8;
+    }
+    100% { 
+      transform: translateY(100vh) translateX(10px) rotate(15deg); 
+      opacity: 0; 
+    }
+  }
+
+  /* NUVENS MAIS REALISTAS */
+  .nuvem {
+    position: absolute;
+    background: rgba(120, 120, 120, 0.8);
+    border-radius: 50%;
+    filter: blur(8px);
+    animation: moverNuvem linear infinite;
+  }
+
+  .nuvem.grossa {
+    background: rgba(80, 80, 80, 0.9);
+    filter: blur(12px);
+  }
+
+  .nuvem.leve {
+    background: rgba(180, 180, 180, 0.6);
+    filter: blur(5px);
+  }
+
+  @keyframes moverNuvem {
+    0% { transform: translateX(-300px); }
+    100% { transform: translateX(calc(100vw + 300px)); }
+  }
+
+  /* SOL MELHORADO */
+  .sol {
+    background: radial-gradient(circle, rgba(255,255,0,0.9) 0%, rgba(255,255,0,0) 70%);
+    border-radius: 50%;
+    width: 120px;
+    height: 120px;
+    top: 30px;
+    right: 30px;
+    animation: brilhar 3s ease-in-out infinite;
+    box-shadow: 
+      0 0 40px 15px rgba(255, 215, 0, 0.6),
+      0 0 80px 30px rgba(255, 165, 0, 0.3);
+    z-index: 5;
+    opacity: 0;
+    transition: opacity 2s ease;
+  }
+
+  .sol.visivel {
+    opacity: 1;
+  }
+
+  @keyframes brilhar {
+    0%, 100% { 
+      transform: scale(1) rotate(0deg);
+      box-shadow: 
+        0 0 40px 15px rgba(255, 215, 0, 0.6),
+        0 0 80px 30px rgba(255, 165, 0, 0.3);
+    }
+    50% { 
+      transform: scale(1.1) rotate(5deg);
+      box-shadow: 
+        0 0 50px 20px rgba(255, 215, 0, 0.8),
+        0 0 100px 40px rgba(255, 165, 0, 0.4);
+    }
+  }
+
+  /* NEVE MELHORADA */
+  .floco {
+    position: absolute;
+    background: white;
+    border-radius: 50%;
+    filter: blur(1.5px);
+    animation: cairNeve linear infinite;
+  }
+
+  @keyframes cairNeve {
+    0% { 
+      transform: translateY(-20px) translateX(0) rotate(0deg); 
+      opacity: 1; 
+    }
+    100% { 
+      transform: translateY(100vh) translateX(30px) rotate(360deg); 
+      opacity: 0; 
+    }
+  }
+
+  /* RAIOS PARA TEMPESTADE */
+  .raio {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0);
+    animation: raioFlash 0.2s ease-out;
+    z-index: 7;
+  }
+
+  @keyframes raioFlash {
+    0% { background: rgba(255, 255, 255, 0); }
+    10% { background: rgba(255, 255, 255, 0.8); }
+    20% { background: rgba(255, 255, 255, 0); }
+    30% { background: rgba(255, 255, 255, 0.6); }
+    40% { background: rgba(255, 255, 255, 0); }
+    100% { background: rgba(255, 255, 255, 0); }
+  }
+
+  .controls {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 25;
+  }
+
+  .btn {
+    background-color: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    border-radius: 50%;
+    width: 45px;
+    height: 45px;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    transition: all 0.3s ease;
+    font-size: 16px;
+    font-weight: bold;
+  }
+
+  .btn:hover, .btn:focus {
+    background-color: rgba(255, 255, 255, 0.25);
+    transform: translateY(-2px);
+    outline: none;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+  }
+
+  .btn.ativo {
+    background-color: rgba(255, 204, 0, 0.8);
+    color: #000;
+  }
+
+  /* Modo escuro para os botões */
+  .dark-mode .btn {
+    background-color: rgba(52, 73, 94, 0.15);
+    color: #ecf0f1;
+    border: 1px solid rgba(236, 240, 241, 0.2);
+  }
+
+  .dark-mode .btn:hover, .dark-mode .btn:focus {
+    background-color: rgba(52, 73, 94, 0.25);
+  }
+
+  .dark-mode .btn.ativo {
+    background-color: rgba(243, 156, 18, 0.8);
+    color: #2c3e50;
+  }
+
+  /* BOLINHAS UMA EMBAIXO DA OUTRA NA LATERAL ESQUERDA */
+  .bolinhas-container {
+    position: fixed;
+    top: 80px; /* Abaixo do aviso */
+    left: 20px;
+    display: flex;
+    flex-direction: column; /* Agora em coluna */
+    gap: 15px;
+    z-index: 20;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 10px;
+    border-radius: 10px;
+    backdrop-filter: blur(5px);
+  }
+
+  .bolinha {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+    font-size: 20px;
+    color: white;
+    cursor: grab;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    transition: all 0.3s ease;
+    user-select: none;
+    position: relative; /* Alterado para relative */
+    z-index: 20;
+    border: 2px solid white;
+  }
+
+  .bolinha:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.4);
+  }
+
+  .bolinha.arrastando {
+    cursor: grabbing;
+    opacity: 0.7;
+    z-index: 100;
+  }
+
+  /* Estilo para bolinhas livres pelo site */
+  .bolinha.livre {
+    position: fixed;
+    z-index: 21;
+    cursor: grab;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .bolinha.livre:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+  }
+
+  .bolinha.livre.arrastando {
+    cursor: grabbing;
+    opacity: 0.8;
+    transform: scale(1.15);
+    z-index: 100;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.5);
+  }
+
+  .bolinha.verde {
+    background-color: #27ae60;
+  }
+
+  .bolinha.azul {
+    background-color: #3498db;
+  }
+
+  .bolinha.vermelha {
+    background-color: #e74c3c;
+  }
+
+  .bolinha-original {
+    position: relative; /* Fixo na posição original */
+  }
+
+  .bolinha-input {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: transparent;
+    color: white;
+    font-size: 20px;
+    font-weight: bold;
+    text-align: center;
+    outline: none;
+    border-radius: 50%;
+    display: none;
+  }
+
+  .bolinha.editando .bolinha-input {
+    display: block;
+  }
+
+  .bolinha.editando .bolinha-texto {
+    display: none;
+  }
+
+  /* Indicador visual de que é arrastável */
+  .bolinha-original::after {
+    content: '⇄';
+    position: absolute;
+    bottom: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 12px;
+    color: rgba(255,255,255,0.7);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  .bolinha-original:hover::after {
+    opacity: 1;
+  }
+
+  /* Botão de exclusão para bolinhas livres */
+  .bolinha.livre .delete-btn {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    width: 20px;
+    height: 20px;
+    background: #e74c3c;
+    border-radius: 50%;
+    font-size: 14px;
+    font-weight: bold;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: 22;
+    color: white;
+    border: 2px solid white;
+    pointer-events: auto;
+  }
+
+  .bolinha.livre:hover .delete-btn {
+    opacity: 1;
+  }
+
+  /* Ajustes para modo tela cheia */
+  body:fullscreen .mapa-container,
+  body:-webkit-full-screen .mapa-container,
+  body:-moz-full-screen .mapa-container {
+    width: 100vw;
+    height: 100vh;
+  }
+
+  body:fullscreen .mapa-img,
+  body:-webkit-full-screen .mapa-img,
+  body:-moz-full-screen .mapa-img {
+    object-fit: contain;
+  }
+
+  /* Responsividade */
+  @media (max-width: 768px) {
+    .aviso {
+      font-size: 14px;
+      padding: 8px 16px;
+    }
+    
+    .info {
+      font-size: 12px;
+      min-width: 150px;
+      padding: 10px 15px;
+    }
+    
+    .menu {
+      min-width: 90px;
+      font-size: 10px;
+      padding: 4px 6px;
+    }
+    
+    .conteudo {
+      font-size: 9px;
+    }
+    
+    .sol {
+      width: 70px;
+      height: 70px;
+      top: 20px;
+      right: 20px;
+    }
+    
+    .lua {
+      width: 60px;
+      height: 60px;
+      top: 30px;
+      left: 30px;
+    }
+    
+    .controls {
+      bottom: 15px;
+      left: 15px;
+    }
+    
+    .btn {
+      width: 40px;
+      height: 40px;
+      font-size: 14px;
+    }
+    
+    .bolinhas-container {
+      top: 70px;
+      left: 15px;
+      gap: 10px;
+      padding: 8px;
+    }
+    
+    .bolinha {
+      width: 40px;
+      height: 40px;
+      font-size: 16px;
+    }
+    
+    .bolinha.livre .delete-btn {
+      width: 18px;
+      height: 18px;
+      font-size: 12px;
+      top: -6px;
+      right: -6px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .menu {
+      min-width: 80px;
+      font-size: 9px;
+      padding: 3px 5px;
+    }
+    
+    .conteudo {
+      font-size: 8px;
+    }
+    
+    .aviso {
+      font-size: 12px;
+      padding: 6px 12px;
+    }
+    
+    .controls {
+      bottom: 10px;
+      left: 10px;
+    }
+    
+    .btn {
+      width: 35px;
+      height: 35px;
+      font-size: 12px;
+    }
+    
+    .bolinhas-container {
+      top: 60px;
+      left: 10px;
+      gap: 8px;
+      padding: 6px;
+    }
+    
+    .bolinha {
+      width: 35px;
+      height: 35px;
+      font-size: 14px;
+    }
+    
+    .bolinha.livre .delete-btn {
+      width: 16px;
+      height: 16px;
+      font-size: 10px;
+      top: -5px;
+      right: -5px;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="aviso" role="alert" aria-live="polite">
+  🟡 Pressione <b>F11</b> para ativar o modo tela cheia | <b>Arraste</b> os menus para reposicionar 🟡
+</div>
+
+<div class="info" aria-live="polite">
+  Data: <span id="data">00/00/00</span><br>
+  Hora: <span id="hora">00:00</span><br>
+  Temperatura: <span id="temperatura">--°C</span><br>
+  Condição: <span id="condicao">--</span>
+</div>
+
+<div class="mapa-container">
+  <!-- IMAGEM ATUALIZADA COM O MAPA DE PALOTINA -->
+  <img src="https://i.imgur.com/mwZz8bw.jpeg" 
+       alt="Mapa de Palotina" 
+       class="mapa-img"
+       onerror="this.src='https://i.imgur.com/mwZz8bw.jpeg'">
+
+  <!-- CICLO DIA/NOITE -->
+  <div class="ciclo-dia-noite" id="cicloDiaNoite"></div>
+  
+  <!-- ESTRELAS -->
+  <div class="estrelas" id="estrelas"></div>
+  
+  <!-- LUA -->
+  <div class="lua" id="lua"></div>
+
+  <!-- Efeito de escurecimento para clima -->
+  <div class="escurecer-tela" id="escurecerTela"></div>
+
+  <!-- Menus posicionados sobre o mapa -->
+  <button class="menu" id="saoCamilo" aria-expanded="false">
+    São Camilo
+    <div class="conteudo" role="region">
+      <p>Ida: 20 min</p>
+      <p>Volta: 20 min</p>
+      <p>Tempo médio partindo da QI: 20 min</p>
+    </div>
+  </button>
+
+  <button class="menu" id="palmital" aria-expanded="false">
+    Palmital
+    <div class="conteudo" role="region">
+      <p>Ida: 20 min</p>
+      <p>Volta: 20 min</p>
+      <p>Tempo médio partindo da QI: 20 min</p>
+    </div>
+  </button>
+
+  <button class="menu" id="boaVista" aria-expanded="false">
+    Boa Vista
+    <div class="conteudo" role="region">
+      <p>Ida: 15 min</p>
+      <p>Volta: 15 min</p>
+      <p>Tempo médio partindo da QI: 15 min</p>
+    </div>
+  </button>
+
+  <button class="menu" id="altoSantaFe" aria-expanded="false">
+    Alto Santa Fé
+    <div class="conteudo" role="region">
+      <p>Ida: 20 min</p>
+      <p>Volta: 20 min</p>
+      <p>Tempo médio partindo da QI: 20 min</p>
+    </div>
+  </button>
+
+  <button class="menu" id="maripa" aria-expanded="false">
+    Maripá
+    <div class="conteudo" role="region">
+      <p>Ida: 25 min</p>
+      <p>Volta: 25 min</p>
+      <p>Tempo médio partindo da QI: 25 min</p>
+    </div>
+  </button>
+
+  <button class="menu" id="cincoMil" aria-expanded="false">
+    Cinco Mil
+    <div class="conteudo" role="region">
+      <p>Ida: 25 min</p>
+      <p>Volta: 25 min</p>
+      <p>Tempo médio partindo da QI: 25 min</p>
+    </div>
+  </button>
+
+  <button class="menu" id="vilaNice" aria-expanded="false">
+    Vila Nice
+    <div class="conteudo" role="region">
+      <p>Ida: 25 min</p>
+      <p>Volta: 25 min</p>
+      <p>Tempo médio partindo da QI: 25 min</p>
+    </div>
+  </button>
+
+  <button class="menu" id="vilaSantoAntonio" aria-expanded="false">
+    Vila Santo Antônio
+    <div class="conteudo" role="region">
+      <p>Ida: 15 min</p>
+      <p>Volta: 15 min</p>
+      <p>Tempo médio partindo da QI: 15 min</p>
+    </div>
+  </button>
+
+  <button class="menu" id="vilaLaSalle" aria-expanded="false">
+    Vila La Salle
+    <div class="conteudo" role="region">
+      <p>Ida: 18 min</p>
+      <p>Volta: 18 min</p>
+      <p>Tempo médio partindo da QI: 18 min</p>
+    </div>
+  </button>
+
+  <button class="menu" id="vilaFloresta" aria-expanded="false">
+    Vila Floresta
+    <div class="conteudo" role="region">
+      <p>Ida: 30 min</p>
+      <p>Volta: 30 min</p>
+      <p>Tempo médio partindo da QI: 30 min</p>
+    </div>
+  </button>
+
+  <button class="menu" id="esquinaProgresso" aria-expanded="false">
+    Esquina Progresso
+    <div class="conteudo" role="region">
+      <p>Ida: 10 min</p>
+      <p>Volta: 10 min</p>
+      <p>Tempo médio partindo da QI: 10 min</p>
+    </div>
+  </button>
+
+  <button class="menu" id="linhaPecuaria" aria-expanded="false">
+    Linha Pecuária
+    <div class="conteudo" role="region">
+      <p>Ida: 15 min</p>
+      <p>Volta: 15 min</p>
+      <p>Tempo médio partindo da QI: 15 min</p>
+    </div>
+  </button>
+
+  <button class="menu" id="linhaSaoCarlos" aria-expanded="false">
+    Linha São Carlos
+    <div class="conteudo" role="region">
+      <p>Ida: 25 min</p>
+      <p>Volta: 25 min</p>
+      <p>Tempo médio partindo da QI: 25 min</p>
+    </div>
+  </button>
+
+  <!-- Animações climáticas -->
+  <div class="chuva" id="chuva" aria-hidden="true"></div>
+  <div class="nuvens" id="nuvens" aria-hidden="true"></div>
+  <div class="sol" id="sol" aria-hidden="true"></div>
+  <div class="neve" id="neve" aria-hidden="true"></div>
+  <div class="tempestade" id="tempestade" aria-hidden="true"></div>
+</div>
+
+<!-- CONTAINER PARA AS BOLINHAS A, E, W - UMA EMBAIXO DA OUTRA -->
+<div class="bolinhas-container" id="bolinhasContainer">
+  <!-- Bolinhas originais -->
+  <div class="bolinha bolinha-original verde" id="bolinhaA" data-cor="verde">
+    <span class="bolinha-texto">A</span>
+    <input type="text" class="bolinha-input" maxlength="1" value="A">
+  </div>
+  <div class="bolinha bolinha-original azul" id="bolinhaE" data-cor="azul">
+    <span class="bolinha-texto">E</span>
+    <input type="text" class="bolinha-input" maxlength="1" value="E">
+  </div>
+  <div class="bolinha bolinha-original vermelha" id="bolinhaW" data-cor="vermelha">
+    <span class="bolinha-texto">W</span>
+    <input type="text" class="bolinha-input" maxlength="1" value="W">
+  </div>
+</div>
+
+<div class="controls">
+  <button class="btn" id="darkMode" aria-label="Alternar modo escuro">🌙</button>
+  <button class="btn" id="refresh" aria-label="Atualizar dados climáticos">↻</button>
+  <button class="btn" id="salvarPosicoes" aria-label="Salvar posições dos menus" title="Salvar posições">💾</button>
+  <button class="btn" id="resetPosicoes" aria-label="Resetar posições dos menus" title="Resetar posições">🔄</button>
+</div>
+
+<script>
+// Sistema de ciclo dia/noite
+class CicloDiaNoite {
+  constructor() {
+    this.cicloElement = document.getElementById('cicloDiaNoite');
+    this.estrelasElement = document.getElementById('estrelas');
+    this.luaElement = document.getElementById('lua');
+    this.solElement = document.getElementById('sol');
+    
+    this.criarEstrelas();
+    this.atualizarCiclo();
+    // Atualizar a cada minuto
+    setInterval(() => this.atualizarCiclo(), 60000);
+  }
+
+  criarEstrelas() {
+    // Criar estrelas aleatórias
+    for (let i = 0; i < 150; i++) {
+      const estrela = document.createElement('div');
+      estrela.className = 'estrela';
+      estrela.style.width = (Math.random() * 2 + 1) + 'px';
+      estrela.style.height = estrela.style.width;
+      estrela.style.left = Math.random() * 100 + 'vw';
+      estrela.style.top = Math.random() * 100 + 'vh';
+      estrela.style.animationDelay = (Math.random() * 4) + 's';
+      estrela.style.opacity = Math.random() * 0.8 + 0.2;
+      this.estrelasElement.appendChild(estrela);
+    }
+  }
+
+  atualizarCiclo() {
+    const agora = new Date();
+    const hora = agora.getHours();
+    const minuto = agora.getMinutes();
+    const horaDecimal = hora + minuto / 60;
+
+    // Remover classes anteriores
+    this.cicloElement.className = 'ciclo-dia-noite';
+    this.estrelasElement.classList.remove('visivel');
+    this.luaElement.classList.remove('visivel');
+    this.solElement.classList.remove('visivel');
+
+    // Determinar período do dia
+    if (horaDecimal >= 0 && horaDecimal < 5) {
+      // Madrugada (00h-05h)
+      this.cicloElement.classList.add('madrugada');
+      this.estrelasElement.classList.add('visivel');
+      this.luaElement.classList.add('visivel');
+    } else if (horaDecimal >= 5 && horaDecimal < 7) {
+      // Amanhecer (05h-07h)
+      this.cicloElement.classList.add('amanhecer');
+      this.solElement.classList.add('visivel');
+    } else if (horaDecimal >= 7 && horaDecimal < 12) {
+      // Manhã (07h-12h)
+      this.cicloElement.classList.add('manha');
+      this.solElement.classList.add('visivel');
+    } else if (horaDecimal >= 12 && horaDecimal < 17) {
+      // Tarde (12h-17h)
+      this.cicloElement.classList.add('tarde');
+      this.solElement.classList.add('visivel');
+    } else if (horaDecimal >= 17 && horaDecimal < 19) {
+      // Entardecer (17h-19h)
+      this.cicloElement.classList.add('entardecer');
+      this.solElement.classList.add('visivel');
+    } else {
+      // Noite (19h-24h)
+      this.cicloElement.classList.add('noite');
+      this.estrelasElement.classList.add('visivel');
+      this.luaElement.classList.add('visivel');
+    }
+
+    console.log(`Hora: ${hora}:${minuto} - Período: ${this.cicloElement.classList[1]}`);
+  }
+}
+
+// Sistema de arrastar menus
+class DragSystem {
+  constructor() {
+    this.dragging = false;
+    this.currentMenu = null;
+    this.startX = 0;
+    this.startY = 0;
+    this.startLeft = 0;
+    this.startTop = 0;
+    
+    this.init();
+  }
+
+  init() {
+    const menus = document.querySelectorAll('.menu');
+    
+    menus.forEach(menu => {
+      menu.addEventListener('mousedown', this.startDrag.bind(this));
+      menu.addEventListener('touchstart', this.startDragTouch.bind(this), { passive: false });
+      menu.addEventListener('click', this.handleClick.bind(this));
+    });
+
+    document.addEventListener('mousemove', this.drag.bind(this));
+    document.addEventListener('mouseup', this.stopDrag.bind(this));
+    document.addEventListener('touchmove', this.dragTouch.bind(this), { passive: false });
+    document.addEventListener('touchend', this.stopDrag.bind(this));
+  }
+
+  startDrag(e) {
+    e.preventDefault();
+    this.dragging = true;
+    this.currentMenu = e.target;
+    
+    this.startX = e.clientX;
+    this.startY = e.clientY;
+    
+    const style = window.getComputedStyle(this.currentMenu);
+    this.startLeft = parseFloat(style.left);
+    this.startTop = parseFloat(style.top);
+    
+    this.currentMenu.classList.add('arrastando');
+    this.currentMenu.style.cursor = 'grabbing';
+  }
+
+  startDragTouch(e) {
+    e.preventDefault();
+    if (e.touches.length !== 1) return;
+    
+    this.dragging = true;
+    this.currentMenu = e.target;
+    
+    this.startX = e.touches[0].clientX;
+    this.startY = e.touches[0].clientY;
+    
+    const style = window.getComputedStyle(this.currentMenu);
+    this.startLeft = parseFloat(style.left);
+    this.startTop = parseFloat(style.top);
+    
+    this.currentMenu.classList.add('arrastando');
+  }
+
+  drag(e) {
+    if (!this.dragging || !this.currentMenu) return;
+    
+    e.preventDefault();
+    
+    const deltaX = e.clientX - this.startX;
+    const deltaY = e.clientY - this.startY;
+    
+    this.currentMenu.style.left = (this.startLeft + deltaX) + 'px';
+    this.currentMenu.style.top = (this.startTop + deltaY) + 'px';
+  }
+
+  dragTouch(e) {
+    if (!this.dragging || !this.currentMenu || e.touches.length !== 1) return;
+    
+    e.preventDefault();
+    
+    const deltaX = e.touches[0].clientX - this.startX;
+    const deltaY = e.touches[0].clientY - this.startY;
+    
+    this.currentMenu.style.left = (this.startLeft + deltaX) + 'px';
+    this.currentMenu.style.top = (this.startTop + deltaY) + 'px';
+  }
+
+  stopDrag() {
+    if (!this.dragging) return;
+    
+    this.dragging = false;
+    
+    if (this.currentMenu) {
+      this.currentMenu.classList.remove('arrastando');
+      this.currentMenu.style.cursor = 'grab';
+      this.currentMenu = null;
+    }
+  }
+
+  handleClick(e) {
+    if (this.dragging) {
+      e.preventDefault();
+      e.stopPropagation();
+      this.dragging = false;
+      return false;
+    }
+    return true;
+  }
+}
+
+// Sistema de salvamento de posições
+class PositionManager {
+  constructor() {
+    this.storageKey = 'mapa-palotina-posicoes';
+    this.bolinhasKey = 'mapa-palotina-bolinhas';
+    this.loadPositions();
+  }
+
+  savePositions() {
+    const positions = {};
+    const menus = document.querySelectorAll('.menu');
+    
+    menus.forEach(menu => {
+      const style = window.getComputedStyle(menu);
+      positions[menu.id] = {
+        left: parseFloat(style.left),
+        top: parseFloat(style.top)
+      };
+    });
+    
+    localStorage.setItem(this.storageKey, JSON.stringify(positions));
+    
+    const btn = document.getElementById('salvarPosicoes');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '✓';
+    btn.style.backgroundColor = 'rgba(46, 204, 113, 0.8)';
+    
+    setTimeout(() => {
+      btn.innerHTML = originalText;
+      btn.style.backgroundColor = '';
+    }, 1000);
+  }
+
+  loadPositions() {
+    const saved = localStorage.getItem(this.storageKey);
+    if (saved) {
+      try {
+        const positions = JSON.parse(saved);
+        Object.keys(positions).forEach(menuId => {
+          const menu = document.getElementById(menuId);
+          if (menu) {
+            menu.style.left = positions[menuId].left + 'px';
+            menu.style.top = positions[menuId].top + 'px';
+          }
+        });
+      } catch (e) {
+        console.error('Erro ao carregar posições:', e);
+      }
+    }
+  }
+
+  resetPositions() {
+    localStorage.removeItem(this.storageKey);
+    location.reload();
+  }
+}
+
+// Sistema de efeitos climáticos avançados
+class WeatherEffects {
+  constructor() {
+    this.escurecerTela = document.getElementById('escurecerTela');
+  }
+
+  clearEffects() {
+    this.escurecerTela.className = 'escurecer-tela';
+    
+    const elements = ['chuva', 'nuvens', 'sol', 'neve', 'tempestade'];
+    elements.forEach(id => {
+      const element = document.getElementById(id);
+      if (element) {
+        element.innerHTML = '';
+        element.style.display = 'none';
+      }
+    });
+  }
+
+  createCloudy() {
+    this.escurecerTela.classList.add('nublado');
+    
+    const nuvensDiv = document.getElementById('nuvens');
+    nuvensDiv.style.display = 'block';
+    
+    for(let i = 0; i < 8; i++){
+      const nuvem = document.createElement('div');
+      nuvem.className = Math.random() > 0.5 ? 'nuvem grossa' : 'nuvem';
+      nuvem.style.width = (150 + Math.random() * 200) + 'px';
+      nuvem.style.height = (60 + Math.random() * 80) + 'px';
+      nuvem.style.top = (i * 80 + Math.random() * 100) + 'px';
+      nuvem.style.animationDuration = (50 + i * 8) + 's';
+      nuvem.style.animationDelay = Math.random() * 15 + 's';
+      nuvensDiv.appendChild(nuvem);
+    }
+  }
+
+  createLightRain() {
+    this.escurecerTela.classList.add('chuva-leve');
+    
+    const chuvaDiv = document.getElementById('chuva');
+    chuvaDiv.style.display = 'block';
+    
+    for(let i = 0; i < 40; i++){
+      const gota = document.createElement('div');
+      gota.className = 'gota leve';
+      gota.style.left = Math.random() * 100 + 'vw';
+      gota.style.animationDuration = (1 + Math.random() * 0.8) + 's';
+      gota.style.animationDelay = Math.random() * 3 + 's';
+      chuvaDiv.appendChild(gota);
+    }
+    
+    this.createCloudy();
+  }
+
+  createHeavyRain() {
+    this.escurecerTela.classList.add('chuva-forte');
+    
+    const chuvaDiv = document.getElementById('chuva');
+    chuvaDiv.style.display = 'block';
+    
+    for(let i = 0; i < 120; i++){
+      const gota = document.createElement('div');
+      gota.className = 'gota forte';
+      gota.style.left = Math.random() * 100 + 'vw';
+      gota.style.animationDuration = (0.6 + Math.random() * 0.4) + 's';
+      gota.style.animationDelay = Math.random() * 2 + 's';
+      chuvaDiv.appendChild(gota);
+    }
+    
+    this.createCloudy();
+  }
+
+  createStorm() {
+    this.escurecerTela.classList.add('tempestade');
+    
+    const chuvaDiv = document.getElementById('chuva');
+    const tempestadeDiv = document.getElementById('tempestade');
+    
+    chuvaDiv.style.display = 'block';
+    tempestadeDiv.style.display = 'block';
+    
+    for(let i = 0; i < 200; i++){
+      const gota = document.createElement('div');
+      gota.className = 'gota tempestade';
+      gota.style.left = Math.random() * 100 + 'vw';
+      gota.style.animationDuration = (0.4 + Math.random() * 0.3) + 's';
+      gota.style.animationDelay = Math.random() * 1 + 's';
+      chuvaDiv.appendChild(gota);
+    }
+    
+    this.startLightning();
+    this.createCloudy();
+  }
+
+  startLightning() {
+    const criarRaio = () => {
+      const raio = document.createElement('div');
+      raio.className = 'raio';
+      document.querySelector('.mapa-container').appendChild(raio);
+      
+      setTimeout(() => {
+        if (raio.parentNode) {
+          raio.parentNode.removeChild(raio);
+        }
+      }, 4000);
+      
+      const nextLightning = Math.random() * 8000 + 2000;
+      setTimeout(criarRaio, nextLightning);
+    };
+    
+    setTimeout(criarRaio, Math.random() * 5000 + 1000);
+  }
+
+  createSunny() {
+    const solDiv = document.getElementById('sol');
+    solDiv.style.display = 'block';
+    
+    const nuvensDiv = document.getElementById('nuvens');
+    nuvensDiv.style.display = 'block';
+    
+    for(let i = 0; i < 4; i++){
+      const nuvem = document.createElement('div');
+      nuvem.className = 'nuvem leve';
+      nuvem.style.width = (100 + Math.random() * 150) + 'px';
+      nuvem.style.height = (40 + Math.random() * 60) + 'px';
+      nuvem.style.top = (i * 120 + Math.random() * 80) + 'px';
+      nuvem.style.animationDuration = (60 + i * 12) + 's';
+      nuvem.style.animationDelay = Math.random() * 20 + 's';
+      nuvensDiv.appendChild(nuvem);
+    }
+  }
+
+  createSnow() {
+    const neveDiv = document.getElementById('neve');
+    neveDiv.style.display = 'block';
+    
+    for(let i = 0; i < 100; i++){
+      const floco = document.createElement('div');
+      floco.className = 'floco';
+      floco.style.width = (3 + Math.random() * 6) + 'px';
+      floco.style.height = floco.style.width;
+      floco.style.left = Math.random() * 100 + 'vw';
+      floco.style.animationDuration = (8 + Math.random() * 15) + 's';
+      floco.style.animationDelay = Math.random() * 8 + 's';
+      neveDiv.appendChild(floco);
+    }
+    
+    this.escurecerTela.classList.add('nublado');
+  }
+}
+
+// SISTEMA DE BOLINHAS ATUALIZADO - BOLINHAS LIVRES PELO SITE
+class BolinhasSystem {
+  constructor() {
+    this.dragging = false;
+    this.currentBolinha = null;
+    this.cloneBolinha = null;
+    this.startX = 0;
+    this.startY = 0;
+    this.startLeft = 0;
+    this.startTop = 0;
+    this.bolinhasContainer = document.getElementById('bolinhasContainer');
+    
+    this.init();
+  }
+
+  init() {
+    // Adicionar event listeners para as bolinhas originais
+    const bolinhasOriginais = document.querySelectorAll('.bolinha-original');
+    bolinhasOriginais.forEach(bolinha => {
+      this.addBolinhaEventListeners(bolinha);
+    });
+
+    // Event listeners globais
+    document.addEventListener('mousemove', this.drag.bind(this));
+    document.addEventListener('mouseup', this.stopDrag.bind(this));
+    document.addEventListener('touchmove', this.dragTouch.bind(this), { passive: false });
+    document.addEventListener('touchend', this.stopDrag.bind(this));
+    
+    // Carregar bolinhas salvas
+    this.loadBolinhas();
+  }
+
+  addBolinhaEventListeners(bolinha) {
+    // Para bolinhas originais: arrastar cria cópia
+    if (bolinha.classList.contains('bolinha-original')) {
+      bolinha.addEventListener('mousedown', this.startDragOriginal.bind(this));
+      bolinha.addEventListener('touchstart', this.startDragOriginalTouch.bind(this), { passive: false });
+    } 
+    // Para bolinhas cópias: arrastar move a própria bolinha
+    else {
+      bolinha.addEventListener('mousedown', this.startDragCopy.bind(this));
+      bolinha.addEventListener('touchstart', this.startDragCopyTouch.bind(this), { passive: false });
+      
+      // Adicionar botão de exclusão visível
+      this.addDeleteButton(bolinha);
+    }
+    
+    // Duplo clique para editar
+    bolinha.addEventListener('dblclick', this.editBolinha.bind(this));
+  }
+
+  addDeleteButton(bolinha) {
+    // Criar um elemento real para o botão de exclusão (não pseudo-elemento)
+    if (!bolinha.querySelector('.delete-btn')) {
+      const deleteBtn = document.createElement('div');
+      deleteBtn.className = 'delete-btn';
+      deleteBtn.innerHTML = '×';
+      deleteBtn.style.cssText = `
+        position: absolute;
+        top: -8px;
+        right: -8px;
+        width: 20px;
+        height: 20px;
+        background: #e74c3c;
+        border-radius: 50%;
+        font-size: 14px;
+        font-weight: bold;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        cursor: pointer;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        z-index: 22;
+        color: white;
+        border: 2px solid white;
+        pointer-events: auto;
+      `;
+      
+      deleteBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.deleteBolinha(bolinha);
+      });
+      
+      bolinha.appendChild(deleteBtn);
+      
+      // Mostrar/ocultar botão ao passar o mouse
+      bolinha.addEventListener('mouseenter', () => {
+        deleteBtn.style.opacity = '1';
+      });
+      
+      bolinha.addEventListener('mouseleave', () => {
+        deleteBtn.style.opacity = '0';
+      });
+    }
+  }
+
+  startDragOriginal(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    this.dragging = true;
+    this.currentBolinha = e.currentTarget;
+    
+    this.startX = e.clientX;
+    this.startY = e.clientY;
+    
+    const rect = this.currentBolinha.getBoundingClientRect();
+    this.startLeft = rect.left;
+    this.startTop = rect.top;
+    
+    // Criar cópia da bolinha
+    this.createClone();
+    
+    this.currentBolinha.classList.add('arrastando');
+  }
+
+  startDragOriginalTouch(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (e.touches.length !== 1) return;
+    
+    this.dragging = true;
+    this.currentBolinha = e.currentTarget;
+    
+    this.startX = e.touches[0].clientX;
+    this.startY = e.touches[0].clientY;
+    
+    const rect = this.currentBolinha.getBoundingClientRect();
+    this.startLeft = rect.left;
+    this.startTop = rect.top;
+    
+    // Criar cópia da bolinha
+    this.createClone();
+    
+    this.currentBolinha.classList.add('arrastando');
+  }
+
+  startDragCopy(e) {
+    // Ignorar se o clique foi no botão de exclusão ou input de edição
+    if (e.target.classList.contains('delete-btn') || e.target.classList.contains('bolinha-input')) return;
+    
+    e.preventDefault();
+    e.stopPropagation();
+    
+    this.dragging = true;
+    this.currentBolinha = e.currentTarget;
+    
+    this.startX = e.clientX;
+    this.startY = e.clientY;
+    
+    const style = window.getComputedStyle(this.currentBolinha);
+    this.startLeft = parseFloat(style.left);
+    this.startTop = parseFloat(style.top);
+    
+    this.currentBolinha.classList.add('arrastando');
+    this.currentBolinha.style.zIndex = '100';
+    
+    // Ocultar botão de exclusão durante o arrasto
+    const deleteBtn = this.currentBolinha.querySelector('.delete-btn');
+    if (deleteBtn) {
+      deleteBtn.style.opacity = '0';
+    }
+  }
+
+  startDragCopyTouch(e) {
+    // Ignorar se o clique foi no botão de exclusão ou input de edição
+    if (e.target.classList.contains('delete-btn') || e.target.classList.contains('bolinha-input')) return;
+    
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (e.touches.length !== 1) return;
+    
+    this.dragging = true;
+    this.currentBolinha = e.currentTarget;
+    
+    this.startX = e.touches[0].clientX;
+    this.startY = e.touches[0].clientY;
+    
+    const style = window.getComputedStyle(this.currentBolinha);
+    this.startLeft = parseFloat(style.left);
+    this.startTop = parseFloat(style.top);
+    
+    this.currentBolinha.classList.add('arrastando');
+    this.currentBolinha.style.zIndex = '100';
+    
+    // Ocultar botão de exclusão durante o arrasto
+    const deleteBtn = this.currentBolinha.querySelector('.delete-btn');
+    if (deleteBtn) {
+      deleteBtn.style.opacity = '0';
+    }
+  }
+
+  createClone() {
+    // Criar uma cópia da bolinha
+    this.cloneBolinha = this.currentBolinha.cloneNode(true);
+    this.cloneBolinha.classList.remove('bolinha-original');
+    this.cloneBolinha.classList.add('livre');
+    this.cloneBolinha.style.position = 'fixed';
+    this.cloneBolinha.style.left = this.startLeft + 'px';
+    this.cloneBolinha.style.top = this.startTop + 'px';
+    this.cloneBolinha.style.zIndex = '100';
+    this.cloneBolinha.id = 'bolinha_' + Date.now(); // ID único
+    
+    // Remover qualquer botão de exclusão existente (será recriado)
+    const existingDeleteBtn = this.cloneBolinha.querySelector('.delete-btn');
+    if (existingDeleteBtn) {
+      existingDeleteBtn.remove();
+    }
+    
+    // Adicionar event listeners para a cópia
+    this.addBolinhaEventListeners(this.cloneBolinha);
+    
+    document.body.appendChild(this.cloneBolinha);
+  }
+
+  drag(e) {
+    if (!this.dragging || !this.currentBolinha) return;
+    
+    e.preventDefault();
+    
+    const deltaX = e.clientX - this.startX;
+    const deltaY = e.clientY - this.startY;
+    
+    // Se estamos arrastando uma cópia (original ou clone)
+    if (this.cloneBolinha) {
+      // Movendo o clone durante a criação
+      this.cloneBolinha.style.left = (this.startLeft + deltaX) + 'px';
+      this.cloneBolinha.style.top = (this.startTop + deltaY) + 'px';
+    } else {
+      // Movendo uma bolinha já existente
+      this.currentBolinha.style.left = (this.startLeft + deltaX) + 'px';
+      this.currentBolinha.style.top = (this.startTop + deltaY) + 'px';
+    }
+  }
+
+  dragTouch(e) {
+    if (!this.dragging || !this.currentBolinha || e.touches.length !== 1) return;
+    
+    e.preventDefault();
+    
+    const deltaX = e.touches[0].clientX - this.startX;
+    const deltaY = e.touches[0].clientY - this.startY;
+    
+    // Se estamos arrastando uma cópia (original ou clone)
+    if (this.cloneBolinha) {
+      // Movendo o clone durante a criação
+      this.cloneBolinha.style.left = (this.startLeft + deltaX) + 'px';
+      this.cloneBolinha.style.top = (this.startTop + deltaY) + 'px';
+    } else {
+      // Movendo uma bolinha já existente
+      this.currentBolinha.style.left = (this.startLeft + deltaX) + 'px';
+      this.currentBolinha.style.top = (this.startTop + deltaY) + 'px';
+    }
+  }
+
+  stopDrag() {
+    if (!this.dragging) return;
+    
+    this.dragging = false;
+    
+    if (this.currentBolinha) {
+      this.currentBolinha.classList.remove('arrastando');
+      
+      // Se é uma bolinha já existente (não original), restaurar z-index
+      if (!this.currentBolinha.classList.contains('bolinha-original')) {
+        this.currentBolinha.style.zIndex = '21';
+      }
+    }
+    
+    // Se temos uma cópia sendo criada, torná-la permanente
+    if (this.cloneBolinha && this.currentBolinha.classList.contains('bolinha-original')) {
+      // Tornar a bolinha permanente no local onde foi solta
+      this.cloneBolinha.style.zIndex = '21';
+      
+      // Salvar a bolinha
+      this.saveBolinhas();
+      
+      this.cloneBolinha = null;
+    }
+    
+    // Salvar posições sempre que parar de arrastar
+    this.saveBolinhas();
+    
+    this.currentBolinha = null;
+  }
+
+  deleteBolinha(bolinha) {
+    if (bolinha && !bolinha.classList.contains('bolinha-original')) {
+      bolinha.remove();
+      this.saveBolinhas();
+    }
+  }
+
+  editBolinha(e) {
+    // Ignorar se o clique foi no botão de exclusão
+    if (e.target.classList.contains('delete-btn')) return;
+    
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const bolinha = e.currentTarget;
+    const texto = bolinha.querySelector('.bolinha-texto');
+    const input = bolinha.querySelector('.bolinha-input');
+    
+    bolinha.classList.add('editando');
+    input.focus();
+    input.select();
+    
+    // Evento para salvar quando o input perder foco
+    const saveEdit = () => {
+      const novoValor = input.value.trim().toUpperCase();
+      if (novoValor) {
+        texto.textContent = novoValor;
+        input.value = novoValor;
+        this.saveBolinhas(); // Salvar após editar
+      }
+      bolinha.classList.remove('editando');
+      input.removeEventListener('blur', saveEdit);
+    };
+    
+    input.addEventListener('blur', saveEdit);
+    
+    // Evento para salvar quando pressionar Enter
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        input.blur();
+      }
+    });
+  }
+
+  saveBolinhas() {
+    const bolinhasLivres = document.querySelectorAll('.bolinha.livre');
+    const bolinhasData = [];
+    
+    bolinhasLivres.forEach(bolinha => {
+      const style = window.getComputedStyle(bolinha);
+      bolinhasData.push({
+        id: bolinha.id,
+        texto: bolinha.querySelector('.bolinha-texto').textContent,
+        cor: bolinha.dataset.cor,
+        left: parseFloat(style.left),
+        top: parseFloat(style.top)
+      });
+    });
+    
+    localStorage.setItem('mapa-palotina-bolinhas', JSON.stringify(bolinhasData));
+  }
+
+  loadBolinhas() {
+    const saved = localStorage.getItem('mapa-palotina-bolinhas');
+    if (saved) {
+      try {
+        const bolinhasData = JSON.parse(saved);
+        bolinhasData.forEach(bolinhaData => {
+          this.createBolinhaFromData(bolinhaData);
+        });
+      } catch (e) {
+        console.error('Erro ao carregar bolinhas:', e);
+      }
+    }
+  }
+
+  createBolinhaFromData(bolinhaData) {
+    // Encontrar a bolinha original com a cor correspondente
+    const original = document.querySelector(`.bolinha-original[data-cor="${bolinhaData.cor}"]`);
+    if (!original) return;
+    
+    // Criar cópia
+    const bolinha = original.cloneNode(true);
+    bolinha.classList.remove('bolinha-original');
+    bolinha.classList.add('livre');
+    bolinha.id = bolinhaData.id;
+    bolinha.style.position = 'fixed';
+    bolinha.style.left = bolinhaData.left + 'px';
+    bolinha.style.top = bolinhaData.top + 'px';
+    bolinha.style.zIndex = '21';
+    
+    // Atualizar texto se for diferente
+    const textoElement = bolinha.querySelector('.bolinha-texto');
+    const inputElement = bolinha.querySelector('.bolinha-input');
+    if (textoElement.textContent !== bolinhaData.texto) {
+      textoElement.textContent = bolinhaData.texto;
+      inputElement.value = bolinhaData.texto;
+    }
+    
+    // Adicionar event listeners
+    this.addBolinhaEventListeners(bolinha);
+    
+    // Adicionar ao body
+    document.body.appendChild(bolinha);
+  }
+}
+
+// Configurações
+const apiKey = '41fb4952fe6e7e459742c89963adb9e3';
+const cidade = 'Palotina,BR';
+
+// Inicializar sistemas
+let dragSystem;
+let positionManager;
+let weatherEffects;
+let cicloDiaNoite;
+let bolinhasSystem;
+
+// Função para obter dados do clima
+async function obterClima() {
+  try {
+    const resposta = await fetch(`https://api.openweathermap.org/data/2.5/weather?q=${cidade}&appid=${apiKey}&units=metric&lang=pt_br`);
+    if (!resposta.ok) throw new Error('Erro na resposta da API');
+    
+    const dados = await resposta.json();
+    const temperatura = dados.main.temp;
+    const descricao = dados.weather[0].description;
+    const condicao = dados.weather[0].main.toLowerCase();
+    const intensidade = dados.weather[0].id;
+
+    document.getElementById('temperatura').textContent = `${temperatura.toFixed(1)}°C`;
+    document.getElementById('condicao').textContent = descricao.charAt(0).toUpperCase() + descricao.slice(1);
+
+    atualizarAnimacoes(condicao, intensidade);
+  } catch (erro) {
+    console.error('Erro ao obter dados climáticos:', erro);
+    document.getElementById('temperatura').textContent = '--°C';
+    document.getElementById('condicao').textContent = 'Dados indisponíveis';
+  }
+}
+
+// Função para atualizar animações climáticas
+function atualizarAnimacoes(condicao, intensidade){
+  weatherEffects.clearEffects();
+
+  let efeitoChuva = 'leve';
+  if (intensidade >= 500 && intensidade <= 504) {
+    efeitoChuva = 'leve';
+  } else if (intensidade >= 520 && intensidade <= 531) {
+    efeitoChuva = 'forte';
+  } else if (intensidade >= 200 && intensidade <= 232) {
+    efeitoChuva = 'tempestade';
+  }
+
+  if(condicao.includes('thunderstorm') || intensidade >= 200 && intensidade <= 232){
+    weatherEffects.createStorm();
+  } else if(condicao.includes('rain') || condicao.includes('drizzle')){
+    if(efeitoChuva === 'forte') {
+      weatherEffects.createHeavyRain();
+    } else {
+      weatherEffects.createLightRain();
+    }
+  } else if(condicao.includes('snow')){
+    weatherEffects.createSnow();
+  } else if(condicao.includes('cloud')){
+    weatherEffects.createCloudy();
+  } else if(condicao.includes('clear') || condicao.includes('sun')){
+    weatherEffects.createSunny();
+  }
+}
+
+// Função para atualizar data e hora
+function atualizarDataHora(){
+  const agora = new Date();
+  const dia = String(agora.getDate()).padStart(2,'0');
+  const mes = String(agora.getMonth()+1).padStart(2,'0');
+  const ano = String(agora.getFullYear()).slice(-2);
+  const horas = String(agora.getHours()).padStart(2,'0');
+  const minutos = String(agora.getMinutes()).padStart(2,'0');
+  document.getElementById('data').textContent = `${dia}/${mes}/${ano}`;
+  document.getElementById('hora').textContent = `${horas}:${minutos}`;
+}
+
+// Inicialização quando o DOM carregar
+document.addEventListener('DOMContentLoaded', function() {
+  // Inicializar sistemas
+  dragSystem = new DragSystem();
+  positionManager = new PositionManager();
+  weatherEffects = new WeatherEffects();
+  cicloDiaNoite = new CicloDiaNoite();
+  bolinhasSystem = new BolinhasSystem();
+  
+  // Atualizar data/hora a cada segundo
+  setInterval(atualizarDataHora, 1000);
+  atualizarDataHora();
+  
+  // Obter dados do clima
+  obterClima();
+  
+  // Configurar eventos dos menus
+  const menus = document.querySelectorAll('.menu');
+  menus.forEach(menu => {
+    menu.addEventListener('click', function(e) {
+      if (!dragSystem.dragging) {
+        const estaAtivo = this.classList.contains('ativo');
+        
+        menus.forEach(m => {
+          m.classList.remove('ativo');
+          m.setAttribute('aria-expanded', 'false');
+        });
+        
+        if (!estaAtivo) {
+          this.classList.add('ativo');
+          this.setAttribute('aria-expanded', 'true');
+        }
+      }
+    });
+  });
+  
+  // Configurar botões
+  document.getElementById('darkMode').addEventListener('click', function() {
+    document.body.classList.toggle('dark-mode');
+    this.textContent = document.body.classList.contains('dark-mode') ? '☀️' : '🌙';
+  });
+  
+  document.getElementById('refresh').addEventListener('click', function() {
+    obterClima();
+    this.style.animation = 'spin 0.5s linear';
+    setTimeout(() => {
+      this.style.animation = '';
+    }, 500);
+  });
+  
+  document.getElementById('salvarPosicoes').addEventListener('click', function() {
+    positionManager.savePositions();
+  });
+  
+  document.getElementById('resetPosicoes').addEventListener('click', function() {
+    if (confirm('Deseja resetar todas as posições dos menus para as posições originais?')) {
+      positionManager.resetPositions();
+    }
+  });
+  
+  // Configurar F11 para tela cheia
+  document.addEventListener('keydown', function(e) {
+    if(e.key === 'F11') {
+      e.preventDefault();
+      const aviso = document.querySelector('.aviso');
+      if(aviso) aviso.style.display = 'none';
+      
+      if(!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => {
+          console.log(`Erro ao tentar entrar em tela cheia: ${err.message}`);
+        });
+      } else {
+        document.exitFullscreen();
+      }
+    }
+  });
+  
+  // Fechar menus ao clicar fora
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('.menu')) {
+      menus.forEach(menu => {
+        menu.classList.remove('ativo');
+        menu.setAttribute('aria-expanded', 'false');
+      });
+    }
+  });
+});
+
+// Adicionar animação de spin
+const style = document.createElement('style');
+style.textContent = `
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+`;
+document.head.appendChild(style);
+</script>
+
+</body>
+</html>
